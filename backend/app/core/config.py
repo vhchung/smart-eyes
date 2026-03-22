@@ -8,7 +8,7 @@ class Settings(BaseSettings):
     PROJECT_NAME: str = "Smart Eyes"
     VERSION: str = "3.0.0"
 
-    DATABASE_URL: str = f"sqlite:///{BASE_DIR}/data/smart_eyes.db"
+    DATABASE_URL: str = f"sqlite:///{BASE_DIR.parent}/data/smart_eyes.db"
 
     ENCRYPTION_KEY: str = ""  # Set via environment variable
 
@@ -21,7 +21,7 @@ class Settings(BaseSettings):
     AI_MODEL_PATH: str = "yolov8n.pt"
     MOONDREAM_MODEL_PATH: str = "moondream model path"
 
-    SNAPSHOT_DIR: Path = BASE_DIR / "data" / "snapshots"
+    SNAPSHOT_DIR: Path = BASE_DIR.parent / "data" / "snapshots"
     MAX_SNAPSHOTS: int = 500
     BATCH_CLEANUP_PERCENT: float = 0.10
 
