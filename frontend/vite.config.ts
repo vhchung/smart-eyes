@@ -12,5 +12,16 @@ export default defineConfig({
   },
   server: {
     port: 3113,
+    proxy: {
+      '/api': {
+        target: 'http://localhost:8118',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api/, ''),
+      },
+      '/streaming/ws': {
+        target: 'http://localhost:8118',
+        ws: true,
+      },
+    },
   },
 });

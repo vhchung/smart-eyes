@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Camera, Settings, AlertCircle } from 'lucide-react';
+import { LayoutDashboard, Camera, Settings, AlertCircle, Play } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useTheme } from 'next-themes';
 import { useEffect, useState } from 'react';
@@ -8,6 +8,7 @@ import { Moon, Sun } from 'lucide-react';
 const navItems = [
   { href: '/', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/cameras', label: 'Cameras', icon: Camera },
+  { href: '/live', label: 'Live', icon: Play },
   { href: '/detections', label: 'Detections', icon: AlertCircle },
   { href: '/settings', label: 'Settings', icon: Settings },
 ];

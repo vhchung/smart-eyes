@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Slider } from '@/components/ui/slider';
-import { Settings as SettingsIcon, Bot, Server, HardDrive } from 'lucide-react';
+import { Settings as SettingsIcon, Bot, HardDrive } from 'lucide-react';
 import { useState } from 'react';
 
 export function Settings() {
@@ -13,8 +13,6 @@ export function Settings() {
   const [localSettings, setLocalSettings] = useState({
     telegram_bot_token: '',
     telegram_chat_id: '',
-    go2rtc_host: 'localhost',
-    go2rtc_port: 1984,
     max_snapshots: 500,
     batch_cleanup_percent: 0.1,
   });
@@ -28,8 +26,6 @@ export function Settings() {
       setLocalSettings({
         telegram_bot_token: settings.telegram_bot_token || '',
         telegram_chat_id: settings.telegram_chat_id || '',
-        go2rtc_host: settings.go2rtc_host,
-        go2rtc_port: settings.go2rtc_port,
         max_snapshots: settings.max_snapshots,
         batch_cleanup_percent: settings.batch_cleanup_percent,
       });
@@ -79,44 +75,6 @@ export function Settings() {
                 }
                 placeholder="123456789"
               />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Server className="h-5 w-5" />
-              go2rtc Configuration
-            </CardTitle>
-            <CardDescription>WebRTC streaming server settings</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="go2rtc_host">Host</Label>
-                <Input
-                  id="go2rtc_host"
-                  value={localSettings.go2rtc_host}
-                  onChange={(e) =>
-                    setLocalSettings({ ...localSettings, go2rtc_host: e.target.value })
-                  }
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="go2rtc_port">Port</Label>
-                <Input
-                  id="go2rtc_port"
-                  type="number"
-                  value={localSettings.go2rtc_port}
-                  onChange={(e) =>
-                    setLocalSettings({
-                      ...localSettings,
-                      go2rtc_port: parseInt(e.target.value) || 1984,
-                    })
-                  }
-                />
-              </div>
             </div>
           </CardContent>
         </Card>

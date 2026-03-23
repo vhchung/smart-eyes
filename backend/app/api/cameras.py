@@ -5,6 +5,7 @@ from typing import Optional
 
 from app.models.database import Camera, get_db
 from app.core.security import encrypt_credentials, decrypt_credentials
+from app.services.webrtc import webrtc_service
 
 router = APIRouter(prefix="/cameras", tags=["cameras"])
 
@@ -77,6 +78,18 @@ def create_camera(camera: CameraCreate, db: Session = Depends(get_db)):
     db.add(db_camera)
     db.commit()
     db.refresh(db_camera)
+
+    # Sync to WebRTC service if camera has RTSP URL and is enabled
+    # Use rtsp_url if available, otherwise fall back to stream_url
+    rtsp_url = db_camera.rtsp_url or db_camera.stream_url
+    if rtsp_url and db_camera.enabled:
+        webrtc_service.add_camera(
+            str(db_camera.id),
+            rtsp_url,
+            camera.username,
+            camera.password,
+        )
+
     return db_camera
 
 
@@ -106,6 +119,31 @@ def update_camera(camera_id: int, camera: CameraUpdate, db: Session = Depends(ge
 
     db.commit()
     db.refresh(db_camera)
+
+    # Sync to WebRTC service on RTSP URL or enabled changes
+    # Use rtsp_url if available, otherwise fall back to stream_url
+    rtsp_url = update_data.get("rtsp_url") or db_camera.rtsp_url or db_camera.stream_url
+    enabled = update_data.get("enabled", db_camera.enabled)
+
+    if enabled and rtsp_url:
+        # Get decrypted credentials for webrtc service
+        username = None
+        password = None
+        if "username" in update_data:
+            username = update_data["username"]
+        elif db_camera.username_encrypted:
+            username = decrypt_credentials(db_camera.username_encrypted)
+        if "password" in update_data:
+            password = update_data["password"]
+        elif db_camera.password_encrypted:
+            password = decrypt_credentials(db_camera.password_encrypted)
+
+        # Remove old and add new if RTSP URL changed
+        webrtc_service.remove_camera(str(camera_id))
+        webrtc_service.add_camera(str(camera_id), rtsp_url, username, password)
+    elif not enabled:
+        webrtc_service.remove_camera(str(camera_id))
+
     return db_camera
 
 
@@ -114,6 +152,10 @@ def delete_camera(camera_id: int, db: Session = Depends(get_db)):
     camera = db.query(Camera).filter(Camera.id == camera_id).first()
     if not camera:
         raise HTTPException(status_code=404, detail="Camera not found")
+
+    # Remove from WebRTC service
+    webrtc_service.remove_camera(str(camera_id))
+
     db.delete(camera)
     db.commit()
     return {"message": "Camera deleted"}

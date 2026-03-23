@@ -54,8 +54,6 @@ export interface DetectionLog {
 export interface Settings {
   telegram_bot_token: string | null;
   telegram_chat_id: string | null;
-  go2rtc_host: string;
-  go2rtc_port: number;
   ai_model_path: string;
   moondream_model_path: string;
   max_snapshots: number;
@@ -88,10 +86,15 @@ export const api = {
   },
 
   streaming: {
-    getStreams: () => fetchJson<Record<string, unknown>>('/streaming/go2rtc/streams'),
-    getWebRTC: (cameraId: number) =>
-      fetchJson<{ camera_id: number; stream_url: string; ws_url: string }>(
-        `/streaming/go2rtc/webrtc/${cameraId}`
-      ),
+    getStreams: () => fetchJson<{ streams: string[] }>('/streaming/streams'),
+    getWebRTC: (cameraId: string) =>
+      fetchJson<{ camera_id: string; offer: string }>(`/streaming/webrtc/${cameraId}`),
+    submitAnswer: (cameraId: string, answer: string) =>
+      fetchJson<{ status: string }>(`/streaming/webrtc/${cameraId}/answer`, {
+        method: 'POST',
+        body: JSON.stringify({ sdp: answer }),
+      }),
+    closeConnection: (cameraId: string) =>
+      fetchJson<{ status: string }>(`/streaming/webrtc/${cameraId}`, { method: 'DELETE' }),
   },
 };

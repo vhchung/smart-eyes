@@ -1,5 +1,34 @@
 # Smart Eyes v3.0 - Implementation Progress
 
+## Session Summary (2026-03-23)
+
+### Work Completed
+
+1. **Replaced go2rtc with aiortc/WebSocket streaming**
+   - Backend: WebSocket endpoint streams JPEG frames from RTSP cameras
+   - Frontend: LiveView page displays multi-camera grid with click-to-focus
+
+2. **Key Files Created**
+   - `backend/app/services/webrtc.py` - WebRTC service with PyAV RTSP decoding
+   - `frontend/src/lib/websocket.ts` - WebSocket client helper
+   - `frontend/src/pages/LiveView.tsx` - Multi-camera live streaming UI
+
+3. **Key Dependencies Added**
+   - `aiortc`, `av`, `opencv-python`, `websockets` to backend
+   - Vite proxy configured for `/api` and `/streaming/ws`
+
+4. **Issues Resolved**
+   - Fixed asyncio event loop issues in sync endpoints
+   - Fixed RTCPeerConnection configuration with RTCConfiguration/RTCIceServer
+   - Added websockets library for uvicorn WebSocket support
+   - Fixed PIL import error by using OpenCV for JPEG encoding
+
+5. **Known Limitation**
+   - HEVC/H.265 cameras (via-he) are CPU-intensive to decode
+   - Solution: Click to focus single camera to reduce frontend load
+
+---
+
 ## Overview
 
 AI Security Server with FastAPI backend and React frontend (Vite/BunJS).
@@ -180,7 +209,8 @@ smart-eyes/
 │   │   ├── models/
 │   │   │   └── database.py
 │   │   └── services/
-│   │       └── telegram.py
+│   │       ├── telegram.py
+│   │       └── webrtc.py      # NEW: WebRTC/RTSP streaming service
 │   ├── migrations/
 │   ├── main.py
 │   ├── alembic.ini
@@ -204,6 +234,7 @@ smart-eyes/
 │   │   │   ├── Dashboard.tsx
 │   │   │   ├── Detections.tsx
 │   │   │   ├── Layout.tsx
+│   │   │   ├── LiveView.tsx    # NEW: Live streaming page
 │   │   │   └── Settings.tsx
 │   │   ├── stores/
 │   │   │   ├── cameraStore.ts
@@ -211,7 +242,9 @@ smart-eyes/
 │   │   │   └── settingsStore.ts
 │   │   ├── lib/
 │   │   │   ├── api.ts
-│   │   │   └── utils.ts
+│   │   │   ├── utils.ts
+│   │   │   ├── websocket.ts    # NEW: WebSocket client helper
+│   │   │   └── webrtc.ts       # NEW: WebRTC client (legacy)
 │   │   ├── App.tsx
 │   │   ├── main.tsx
 │   │   └── index.css
@@ -251,6 +284,104 @@ bun run build
 
 ---
 
-## Status: Phase 1-3 Complete
+## Phase 4: Streaming Migration (go2rtc → aiortc/WebSocket)
 
-All core functionality implemented. Ready for Phase 4: Integration (WebRTC streaming, AI detection pipeline, Telegram notifications).
+### 2026-03-23 - Migration Overview
+
+**Decision:** Replace go2rtc sidecar with Python-based RTSP→WebRTC streaming using aiortc and WebSocket.
+
+**Reason:** go2rtc integration had issues with camera sync, manual configuration, and WebRTC ICE negotiation failures.
+
+### 2026-03-23 - Backend Changes
+
+**`pyproject.toml`** - Added dependencies:
+
+- `aiortc>=1.9.0` - WebRTC peer connection handling
+- `av>=12.0.0` - PyAV for RTSP stream decoding
+- `opencv-python>=4.8.0` - JPEG frame encoding
+- `websockets>=12.0` - WebSocket support
+
+**`app/core/config.py`** - Removed go2rtc settings:
+
+- Removed `GO2RTC_HOST` and `GO2RTC_PORT`
+
+**`app/api/streaming.py`** - Complete rewrite:
+
+- Removed all go2rtc endpoints (`/go2rtc/streams`, `/go2rtc/webrtc/{id}`, `/go2rtc/restart`)
+- New WebSocket endpoint `/streaming/ws/{camera_id}` for JPEG frame streaming
+- `/streaming/webrtc/{camera_id}` - Get SDP offer for WebRTC
+- `/streaming/webrtc/{camera_id}/answer` - Submit WebRTC answer
+- `/streaming/webrtc/{camera_id}` DELETE - Close connection
+
+**`app/api/cameras.py`** - Added WebRTC service sync:
+
+- `add_camera()` called on create with RTSP URL
+- `remove_camera()` called on delete
+- `add_camera()`/`remove_camera()` called on update with RTSP URL changes
+- Falls back to `stream_url` if `rtsp_url` is empty
+
+**`app/services/webrtc.py`** (NEW):
+
+- `CameraStreamTrack` - Reads RTSP frames using PyAV, queues frames
+- `WebRTCService` - Manages peer connections and RTSP URLs
+- `create_offer()` - Creates WebRTC SDP offer with ICE servers
+- `handle_answer()` - Processes client answer SDP
+
+**`main.py`** - Lifecycle management:
+
+- Startup: Loads existing enabled cameras into WebRTC service
+- Shutdown: Closes all WebRTC connections
+
+**`app/api/settings.py`** - Removed go2rtc configuration
+
+**`.env`** - Removed `GO2RTC_HOST` and `GO2RTC_PORT`
+
+### 2026-03-23 - Frontend Changes
+
+**`vite.config.ts`** - Proxy configuration:
+
+- `/api` → backend with path rewrite
+- `/streaming/ws` → backend with WebSocket support
+
+**`src/lib/api.ts`** - Updated streaming API:
+
+- `getStreams()` → `/streaming/streams`
+- `getWebRTC(cameraId)` → `/streaming/webrtc/{cameraId}` (returns SDP offer)
+- `submitAnswer(cameraId, answer)` → POST `/streaming/webrtc/{cameraId}/answer`
+- `closeConnection(cameraId)` → DELETE `/streaming/webrtc/{cameraId}`
+- Removed go2rtc fields from Settings interface
+
+**`src/lib/websocket.ts`** (NEW):
+
+- `createWebSocketConnection()` - Connects to `/streaming/ws/{cameraId}`
+- `closeWebSocketConnection()` - Closes WebSocket
+- Handles base64 JPEG frame messages
+
+**`src/pages/LiveView.tsx`** (NEW):
+
+- Multi-camera grid live streaming page at `/live`
+- WebSocket-based JPEG frame display
+- Click to focus single camera (closes other connections)
+- Stop button to disconnect focused camera
+- Back to Grid button to reconnect all
+- Auto-connects first 2 cameras only to reduce load
+
+**`src/pages/Layout.tsx`** - Added "Live" nav item with Play icon
+
+**`src/pages/Settings.tsx`** - Removed go2rtc configuration card
+
+**`src/App.tsx`** - Added `/live` route for LiveView
+
+### 2026-03-23 - Known Issues
+
+**HEVC/H.265 Lag:** The via-he camera uses HEVC codec which is CPU-intensive to decode. Options:
+
+1. Lower camera resolution in camera's web interface
+2. Use hardware-accelerated decoding (not implemented)
+3. Accept lower FPS for HEVC streams
+
+---
+
+## Status: Phase 1-4 Complete
+
+Core streaming implemented. Live view page working with WebSocket-based JPEG streaming. Known limitation: HEVC streams may lag on CPU-only systems.

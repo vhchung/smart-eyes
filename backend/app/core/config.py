@@ -15,9 +15,6 @@ class Settings(BaseSettings):
     TELEGRAM_BOT_TOKEN: str = ""
     TELEGRAM_CHAT_ID: str = ""
 
-    GO2RTC_HOST: str = "localhost"
-    GO2RTC_PORT: int = 1984
-
     AI_MODEL_PATH: str = "yolov8n.pt"
     MOONDREAM_MODEL_PATH: str = "moondream model path"
 

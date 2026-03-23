@@ -8,6 +8,7 @@ import { Dashboard } from '@/pages/Dashboard';
 import { Cameras } from '@/pages/Cameras';
 import { Settings } from '@/pages/Settings';
 import { Detections } from '@/pages/Detections';
+import { LiveView } from '@/pages/LiveView';
 
 function App() {
   const [showSplash, setShowSplash] = useState(true);
@@ -24,6 +25,7 @@ function App() {
             <Routes>
               <Route path="/" element={<Dashboard />} />
               <Route path="/cameras" element={<Cameras />} />
+              <Route path="/live" element={<LiveView />} />
               <Route path="/settings" element={<Settings />} />
               <Route path="/detections" element={<Detections />} />
             </Routes>
