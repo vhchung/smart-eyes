@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -5,8 +6,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
 from app.models.database import init_db, SessionLocal, Camera
 from app.core.security import decrypt_credentials
-from app.api import cameras, settings as settings_router, detections, snapshots, streaming
+from app.api import cameras, settings as settings_router, detections, snapshots, streaming, status
 from app.services.webrtc import webrtc_service
+from app.services.detection import detection_service
 
 logger = logging.getLogger(__name__)
 
@@ -28,6 +30,7 @@ app.include_router(settings_router.router)
 app.include_router(detections.router)
 app.include_router(snapshots.router)
 app.include_router(streaming.router)
+app.include_router(status.router)
 
 
 @app.on_event("startup")
@@ -59,9 +62,16 @@ def startup_event():
     finally:
         db.close()
 
+    # Start detection service if enabled
+    from app.core.config import settings
+    if settings.DETECTION_ENABLED:
+        asyncio.create_task(detection_service.start())
+        logger.info("Startup: DetectionService started")
+
 
 @app.on_event("shutdown")
 async def shutdown_event():
+    await detection_service.stop()
     await webrtc_service.close_all()
 
 

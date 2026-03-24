@@ -1,12 +1,15 @@
 # Smart Eyes v3.0 - Implementation Progress
 
-## Session Summary (2026-03-23)
+## Session Summary (2026-03-24)
 
 ### Work Completed
 
-1. **Replaced go2rtc with aiortc/WebSocket streaming**
-   - Backend: WebSocket endpoint streams JPEG frames from RTSP cameras
-   - Frontend: LiveView page displays multi-camera grid with click-to-focus
+1. **Implemented AI Person Detection Feature**
+   - DetectionService with YOLOv8n person detection + BLIP captioning
+   - Status endpoint for frontend to track model readiness
+   - NotificationManager with Telegram provider
+
+**Note:** Full session details in `SESSION-2026-03-24.md`
 
 2. **Key Files Created**
    - `backend/app/services/webrtc.py` - WebRTC service with PyAV RTSP decoding
@@ -202,7 +205,8 @@ smart-eyes/
 │   │   │   ├── detections.py
 │   │   │   ├── settings.py
 │   │   │   ├── snapshots.py
-│   │   │   └── streaming.py
+│   │   │   ├── streaming.py
+│   │   │   └── status.py      # Detection status endpoint
 │   │   ├── core/
 │   │   │   ├── config.py
 │   │   │   └── security.py
@@ -210,7 +214,9 @@ smart-eyes/
 │   │   │   └── database.py
 │   │   └── services/
 │   │       ├── telegram.py
-│   │       └── webrtc.py      # NEW: WebRTC/RTSP streaming service
+│   │       ├── webrtc.py      # WebRTC/RTSP streaming
+│   │       ├── detection.py   # AI person detection
+│   │       └── notifier.py    # Notification providers
 │   ├── migrations/
 │   ├── main.py
 │   ├── alembic.ini
@@ -385,3 +391,132 @@ bun run build
 ## Status: Phase 1-4 Complete
 
 Core streaming implemented. Live view page working with WebSocket-based JPEG streaming. Known limitation: HEVC streams may lag on CPU-only systems.
+
+---
+
+## Phase 5: AI Person Detection
+
+### 2026-03-24 - Feature Implementation
+
+**Decision:** Implement AI-powered person detection using YOLOv8n + BLIP image captioning.
+
+**Reason:** Smart Eyes needs real-time person detection with action descriptions and Telegram notifications.
+
+### 2026-03-24 - Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                     DetectionService                             │
+│  ┌──────────────┐    ┌──────────────┐    ┌──────────────────┐   │
+│  │ FrameSampler │───▶│  YOLOv8n     │───▶│ BLIP Captioning  │   │
+│  │ (RTSP)       │    │ (Person Det) │    │ (Action Desc)   │   │
+│  └──────────────┘    └──────────────┘    └────────┬─────────┘   │
+│                                                    │            │
+│                              ┌─────────────────────┘            │
+│                              ▼                                  │
+│                     ┌──────────────────┐                        │
+│                     │ NotificationMgr  │                        │
+│                     │ (Telegram + more)│                        │
+│                     └──────────────────┘                        │
+└─────────────────────────────────────────────────────────────────┘
+                                    │
+                                    ▼
+                           ┌─────────────────┐
+                           │   Database      │
+                           │   DetectionLog  │
+                           └─────────────────┘
+```
+
+### 2026-03-24 - Dependencies Added
+
+**`pyproject.toml`**:
+
+- `ultralytics>=8.0.0` - YOLOv8n person detection
+- `torch>=2.0.0` - PyTorch for model inference
+- `transformers>=4.30.0` - BLIP captioning
+- `Pillow>=10.0.0` - Image processing
+- `accelerate>=0.20.0` - Fast inference
+
+### 2026-03-24 - Files Created
+
+**`backend/app/services/notifier.py`**:
+
+- `NotificationProvider` ABC
+- `TelegramNotificationProvider`
+- `NotificationManager` with extensible provider support
+
+**`backend/app/services/detection.py`**:
+
+- `FrameSampler` - Samples frames from RTSP with ROI support
+- `PersonDetector` - YOLOv8n person detection (class 0)
+- `ActionDescriber` - BLIP image captioning
+- `DetectionService` - Per-camera detection loops with cooldown
+
+**`backend/app/api/status.py`**:
+
+- `GET /status/detection` - Model ready/downloading status
+
+### 2026-03-24 - Configuration Added
+
+**`backend/app/core/config.py`**:
+
+- `AI_MODEL_PATH: str = "yolov8n.pt"`
+- `CAPTION_MODEL_PATH: str = "Salesforce/blip-image-captioning-base"`
+- `DETECTION_INTERVAL: float = 2.0`
+- `DETECTION_COOLDOWN: float = 60.0`
+- `DETECTION_ENABLED: bool = True`
+- `DETECTION_MIN_CONFIDENCE: float = 0.5`
+
+### 2026-03-24 - Backend Changes
+
+**`main.py`**:
+
+- Starts DetectionService on startup (if `DETECTION_ENABLED`)
+- Stops DetectionService on shutdown
+
+**`app/api/settings.py`**:
+
+- Updated to use `caption_model_path` instead of `moondream_model_path`
+
+### 2026-03-24 - Moondream2 Compatibility Issue
+
+**Problem:** Moondream2 (`vikhyatk/moondream2`) had:
+
+- `trust_remote_code` interactive prompts
+- `all_tied_weights_keys` AttributeError with newer transformers
+
+**Solution:** Switched to BLIP image captioning (`Salesforce/blip-image-captioning-base`) which is well-maintained and doesn't require custom code.
+
+### 2026-03-24 - Status Endpoint
+
+**`GET /status/detection`** returns:
+
+```json
+{
+  "models_ready": true,
+  "models_downloading": false,
+  "init_error": null,
+  "running": true,
+  "active_tasks": 2
+}
+```
+
+Frontend can poll this endpoint to know when AI models are downloaded and ready.
+
+### 2026-03-24 - Installation Steps
+
+```bash
+# Install new dependencies
+cd backend
+uv pip install ultralytics torch transformers Pillow accelerate
+
+# Clear any cached Moondream2 models (if upgrading from Moondream2)
+rm -rf ~/.cache/huggingface/modules/transformers_modules/vikhyatk*
+
+# Restart backend
+uv run main.py
+```
+
+### Status: Phase 5 Complete (Implementation)
+
+AI person detection feature implemented with YOLOv8n + BLIP. Status endpoint allows frontend to track model readiness. Telegram notifications with snapshots enabled.

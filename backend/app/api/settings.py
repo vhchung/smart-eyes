@@ -13,7 +13,7 @@ class SettingsUpdate(BaseModel):
     telegram_bot_token: Optional[str] = None
     telegram_chat_id: Optional[str] = None
     ai_model_path: Optional[str] = None
-    moondream_model_path: Optional[str] = None
+    caption_model_path: Optional[str] = None
     max_snapshots: Optional[int] = None
     batch_cleanup_percent: Optional[float] = None
 
@@ -22,7 +22,7 @@ class SettingsResponse(BaseModel):
     telegram_bot_token: Optional[str] = None
     telegram_chat_id: Optional[str] = None
     ai_model_path: str
-    moondream_model_path: str
+    caption_model_path: str
     max_snapshots: int
     batch_cleanup_percent: float
 
@@ -35,7 +35,7 @@ def get_settings(db: Session = Depends(get_db)):
         "telegram_bot_token": None,
         "telegram_chat_id": None,
         "ai_model_path": settings.AI_MODEL_PATH,
-        "moondream_model_path": settings.MOONDREAM_MODEL_PATH,
+        "caption_model_path": settings.CAPTION_MODEL_PATH,
         "max_snapshots": settings.MAX_SNAPSHOTS,
         "batch_cleanup_percent": settings.BATCH_CLEANUP_PERCENT,
     }
@@ -48,8 +48,8 @@ def get_settings(db: Session = Depends(get_db)):
             settings_dict["telegram_chat_id"] = decrypt_credentials(s.value) if s.value else None
         elif s.key == "ai_model_path":
             settings_dict["ai_model_path"] = s.value
-        elif s.key == "moondream_model_path":
-            settings_dict["moondream_model_path"] = s.value
+        elif s.key == "caption_model_path":
+            settings_dict["caption_model_path"] = s.value
         elif s.key == "max_snapshots":
             settings_dict["max_snapshots"] = int(s.value)
         elif s.key == "batch_cleanup_percent":

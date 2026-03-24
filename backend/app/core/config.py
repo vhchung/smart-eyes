@@ -16,7 +16,12 @@ class Settings(BaseSettings):
     TELEGRAM_CHAT_ID: str = ""
 
     AI_MODEL_PATH: str = "yolov8n.pt"
-    MOONDREAM_MODEL_PATH: str = "moondream model path"
+    CAPTION_MODEL_PATH: str = "Salesforce/blip-image-captioning-base"
+
+    DETECTION_INTERVAL: float = 2.0
+    DETECTION_COOLDOWN: float = 60.0
+    DETECTION_ENABLED: bool = True
+    DETECTION_MIN_CONFIDENCE: float = 0.5
 
     SNAPSHOT_DIR: Path = BASE_DIR.parent / "data" / "snapshots"
     MAX_SNAPSHOTS: int = 500
