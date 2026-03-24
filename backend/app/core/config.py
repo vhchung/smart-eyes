@@ -21,7 +21,7 @@ class Settings(BaseSettings):
     DETECTION_INTERVAL: float = 2.0
     DETECTION_COOLDOWN: float = 60.0
     DETECTION_ENABLED: bool = True
-    DETECTION_MIN_CONFIDENCE: float = 0.5
+    DETECTION_MIN_CONFIDENCE: float = 0.7
 
     SNAPSHOT_DIR: Path = BASE_DIR.parent / "data" / "snapshots"
     MAX_SNAPSHOTS: int = 500

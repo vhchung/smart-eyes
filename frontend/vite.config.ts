@@ -22,6 +22,10 @@ export default defineConfig({
         target: 'http://localhost:8118',
         ws: true,
       },
+      '/snapshot-files': {
+        target: 'http://localhost:8118',
+        changeOrigin: true,
+      },
     },
   },
 });

@@ -72,6 +72,9 @@ class NotificationManager:
         snapshot_path: Optional[str] = None,
     ) -> bool:
         """Send notification through all providers. Returns True if any provider succeeds."""
+        import logging
+        logger = logging.getLogger(__name__)
+
         results = []
         for provider in self._providers:
             try:
@@ -79,7 +82,10 @@ class NotificationManager:
                     camera_name, detection_type, confidence, description, snapshot_path
                 )
                 results.append(result)
-            except Exception:
+                if not result:
+                    logger.warning(f"Notification provider {type(provider).__name__} returned False")
+            except Exception as e:
+                logger.error(f"Notification provider {type(provider).__name__} failed: {e}")
                 results.append(False)
         return any(results)
 

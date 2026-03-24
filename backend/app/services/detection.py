@@ -111,10 +111,15 @@ class PersonDetector:
             self._model = YOLO(self.model_path)
 
     def detect(self, image: Image.Image, min_confidence: float = 0.5) -> list[PersonDetection]:
-        """Detect persons in the image."""
+        """Detect persons in the image.
+
+        Only detects persons that appear to be fully visible (head to toe).
+        """
         self._load_model()
         results = self._model(image, verbose=False)
         persons = []
+        img_width, img_height = image.size
+
         for result in results:
             boxes = result.boxes
             for box in boxes:
@@ -122,6 +127,26 @@ class PersonDetector:
                 conf = float(box.conf[0])
                 if cls == 0 and conf >= min_confidence:  # person class
                     x1, y1, x2, y2 = map(int, box.xyxy[0])
+
+                    # Calculate bounding box dimensions
+                    bbox_width = x2 - x1
+                    bbox_height = y2 - y1
+
+                    # Skip if person is too small (less than 20% of frame height)
+                    # This filters out distant/partial detections
+                    if bbox_height < img_height * 0.20:
+                        continue
+
+                    # Skip if person is cut off at the bottom (feet not visible)
+                    # Person is considered complete if bottom of bbox is near frame bottom
+                    if y2 < img_height * 0.85:
+                        continue
+
+                    # Skip if person is cut off at top (head not visible)
+                    # Person is considered complete if top of bbox is near frame top
+                    if y1 > img_height * 0.15:
+                        continue
+
                     persons.append(PersonDetection(
                         bbox=(x1, y1, x2, y2),
                         confidence=conf
@@ -130,32 +155,45 @@ class PersonDetector:
 
 
 class ActionDescriber:
-    """Describes person actions using BLIP image captioning."""
+    """Describes person actions using BLIP image captioning + Google Translate."""
 
     def __init__(self, model_path: Optional[str] = None):
         self.model_path = model_path or settings.CAPTION_MODEL_PATH
         self._model = None
         self._processor = None
         self._device = "cuda" if torch.cuda.is_available() else "cpu"
+        self._translator = None
 
     def _load_model(self):
-        """Load BLIP captioning model (lazy loading)."""
+        """Load BLIP image captioning model."""
         if self._model is None:
-            logger.info(f"Loading BLIP captioning model from {self.model_path}")
+            logger.info(f"Loading captioning model from {self.model_path}")
             from transformers import BlipForConditionalGeneration, AutoProcessor
             self._processor = AutoProcessor.from_pretrained(self.model_path)
             self._model = BlipForConditionalGeneration.from_pretrained(self.model_path)
             self._model.to(self._device)
 
+    def _get_translator(self):
+        """Lazy-load the translator."""
+        if self._translator is None:
+            from deep_translator import GoogleTranslator
+            self._translator = GoogleTranslator(source='en', target='vi')
+        return self._translator
+
     def describe(self, image: Image.Image, bbox: tuple[int, int, int, int]) -> str:
-        """Generate caption for a person in the given bbox."""
+        """Generate caption for a person in the given bbox and translate to Vietnamese."""
         self._load_model()
         try:
             cropped = image.crop(bbox)
             inputs = self._processor(images=cropped, return_tensors="pt").to(self._device)
             output = self._model.generate(**inputs, max_new_tokens=50)
             caption = self._processor.decode(output[0], skip_special_tokens=True)
-            return caption.strip()
+            english_caption = caption.strip()
+
+            # Translate to Vietnamese
+            translator = self._get_translator()
+            vietnamese_caption = translator.translate(english_caption)
+            return vietnamese_caption
         except Exception as e:
             logger.error(f"Error describing action: {e}")
             return "Unknown action"
@@ -242,7 +280,7 @@ class DetectionService:
 
         db = SessionLocal()
         try:
-            cameras = db.query(Camera).filter(Camera.enabled == True).all()
+            cameras = db.query(Camera).filter(Camera.enabled == True, Camera.detection_enabled == True).all()
             for camera in cameras:
                 rtsp_url = camera.rtsp_url or camera.stream_url
                 if rtsp_url:
@@ -349,13 +387,20 @@ class DetectionService:
         finally:
             db.close()
 
-        await notification_manager.notify(
+        # Only send notification if enabled for this camera
+        if not camera.notification_enabled:
+            logger.info(f"Notification disabled for camera {camera.id}, skipping")
+            return
+
+        logger.info(f"Sending Telegram notification for camera {camera.id}")
+        notification_sent = await notification_manager.notify(
             camera_name=camera.name,
             detection_type="person",
             confidence=best_person.confidence,
             description=best_desc,
             snapshot_path=snapshot_path,
         )
+        logger.info(f"Telegram notification {'sent' if notification_sent else 'FAILED'} for camera {camera.id}")
 
     async def _save_snapshot(self, image: Image.Image, camera_id: int) -> Optional[str]:
         """Save a snapshot image."""

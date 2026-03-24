@@ -1,34 +1,47 @@
 # Smart Eyes v3.0 - Implementation Progress
 
-## Session Summary (2026-03-24)
+## Session Summary (2026-03-24 PM)
 
 ### Work Completed
 
-1. **Implemented AI Person Detection Feature**
-   - DetectionService with YOLOv8n person detection + BLIP captioning
-   - Status endpoint for frontend to track model readiness
-   - NotificationManager with Telegram provider
+1. **Live View UI Improvements**
+   - Manual Play/Stop buttons - cameras no longer auto-connect
+   - Play/Stop button at bottom-right of each camera card
+   - Proper z-index layering to avoid overlay conflicts
+
+2. **Detection Logs Enhancements**
+   - Snapshot images now display in detection cards
+   - Caption/description shown below detection info
+   - Static file serving at `/snapshot-files`
+   - Vite proxy for `/snapshot-files` → backend
+
+3. **AI Person Detection - Two-Step Captioning**
+   - BLIP generates English caption
+   - deep-translator (Google Translate) converts to Vietnamese
+   - Added `deep-translator>=1.11.0` dependency
+
+4. **Strict Person Detection Rules**
+   - Person height >= 20% of frame height (filters distant/partial)
+   - Bottom of bbox within 85% of frame bottom (feet visible)
+   - Top of bbox within 15% of frame top (head visible)
+
+5. **Per-Camera Detection & Notification Toggles**
+   - `detection_enabled` - enable/disable AI detection per camera
+   - `notification_enabled` - enable/disable Telegram notifications
+   - Database columns added: `detection_enabled`, `notification_enabled`
+   - Frontend UI with Switch controls in camera edit dialog
+
+6. **Telegram Notification Improvements**
+   - Credentials now fetched from database settings (not config)
+   - Improved error logging for notification failures
+   - Notification cooldown: 60 seconds per camera
 
 **Note:** Full session details in `SESSION-2026-03-24.md`
 
-2. **Key Files Created**
-   - `backend/app/services/webrtc.py` - WebRTC service with PyAV RTSP decoding
-   - `frontend/src/lib/websocket.ts` - WebSocket client helper
-   - `frontend/src/pages/LiveView.tsx` - Multi-camera live streaming UI
+### Known Limitations
 
-3. **Key Dependencies Added**
-   - `aiortc`, `av`, `opencv-python`, `websockets` to backend
-   - Vite proxy configured for `/api` and `/streaming/ws`
-
-4. **Issues Resolved**
-   - Fixed asyncio event loop issues in sync endpoints
-   - Fixed RTCPeerConnection configuration with RTCConfiguration/RTCIceServer
-   - Added websockets library for uvicorn WebSocket support
-   - Fixed PIL import error by using OpenCV for JPEG encoding
-
-5. **Known Limitation**
-   - HEVC/H.265 cameras (via-he) are CPU-intensive to decode
-   - Solution: Click to focus single camera to reduce frontend load
+- Caption model (BLIP) is English-only; translation via Google Translate adds latency
+- HEVC/H.265 cameras are CPU-intensive; use single-camera focus view
 
 ---
 

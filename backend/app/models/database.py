@@ -20,6 +20,8 @@ class Camera(Base):
     username_encrypted = Column(Text, nullable=True)
     password_encrypted = Column(Text, nullable=True)
     enabled = Column(Boolean, default=True)
+    detection_enabled = Column(Boolean, default=True)
+    notification_enabled = Column(Boolean, default=True)
     roi_x = Column(Integer, default=0)
     roi_y = Column(Integer, default=0)
     roi_width = Column(Integer, default=0)

@@ -2,6 +2,7 @@ import asyncio
 import logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 from app.core.config import settings
 from app.models.database import init_db, SessionLocal, Camera
@@ -31,6 +32,9 @@ app.include_router(detections.router)
 app.include_router(snapshots.router)
 app.include_router(streaming.router)
 app.include_router(status.router)
+
+# Mount snapshots directory for static file serving at /snapshot-files
+app.mount("/snapshot-files", StaticFiles(directory=str(settings.SNAPSHOT_DIR)), name="snapshot-files")
 
 
 @app.on_event("startup")

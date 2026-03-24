@@ -32,6 +32,8 @@ export function Cameras() {
     username: '',
     password: '',
     enabled: true,
+    detection_enabled: true,
+    notification_enabled: true,
     roi_x: 0,
     roi_y: 0,
     roi_width: 0,
@@ -51,6 +53,8 @@ export function Cameras() {
         stream_url: camera.stream_url,
         rtsp_url: camera.rtsp_url || '',
         enabled: camera.enabled,
+        detection_enabled: camera.detection_enabled,
+        notification_enabled: camera.notification_enabled,
         roi_x: camera.roi_x,
         roi_y: camera.roi_y,
         roi_width: camera.roi_width,
@@ -66,6 +70,8 @@ export function Cameras() {
         username: '',
         password: '',
         enabled: true,
+        detection_enabled: true,
+        notification_enabled: true,
         roi_x: 0,
         roi_y: 0,
         roi_width: 0,
@@ -159,6 +165,14 @@ export function Cameras() {
                 </span>
               </CardHeader>
               <CardContent>
+                <div className="flex gap-4 mb-4 text-xs text-muted-foreground">
+                  <span className={camera.detection_enabled ? 'text-green-500' : ''}>
+                    Detection: {camera.detection_enabled ? 'ON' : 'OFF'}
+                  </span>
+                  <span className={camera.notification_enabled ? 'text-green-500' : ''}>
+                    Notify: {camera.notification_enabled ? 'ON' : 'OFF'}
+                  </span>
+                </div>
                 <p className="text-xs text-muted-foreground mb-4 truncate">{camera.stream_url}</p>
                 <div className="flex items-center gap-2">
                   <Button variant="outline" size="sm" onClick={() => handleOpenDialog(camera)}>
@@ -220,6 +234,32 @@ export function Cameras() {
                     id="enabled"
                     checked={formData.enabled}
                     onCheckedChange={(checked) => setFormData({ ...formData, enabled: checked })}
+                  />
+                </div>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="detection_enabled">Person Detection</Label>
+                <div className="pt-2">
+                  <Switch
+                    id="detection_enabled"
+                    checked={formData.detection_enabled ?? true}
+                    onCheckedChange={(checked) =>
+                      setFormData({ ...formData, detection_enabled: checked })
+                    }
+                  />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="notification_enabled">Notifications</Label>
+                <div className="pt-2">
+                  <Switch
+                    id="notification_enabled"
+                    checked={formData.notification_enabled ?? true}
+                    onCheckedChange={(checked) =>
+                      setFormData({ ...formData, notification_enabled: checked })
+                    }
                   />
                 </div>
               </div>

@@ -50,6 +50,14 @@ export function Detections() {
     }
   };
 
+  // Convert full file path to snapshot URL path
+  // e.g., /media/chungvh/KINGSTON1/Projects/smart-eyes/data/snapshots/xxx.jpg -> /snapshot-files/xxx.jpg
+  const getSnapshotUrl = (snapshotPath: string | null) => {
+    if (!snapshotPath) return null;
+    const filename = snapshotPath.split('/').pop();
+    return `/snapshot-files/${filename}`;
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -88,43 +96,58 @@ export function Detections() {
         </Card>
       ) : (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {detections.map((detection) => (
-            <Card key={detection.id} className="overflow-hidden">
-              <div
-                className="aspect-video bg-muted flex items-center justify-center cursor-pointer"
-                onClick={() => setPreviewImage(detection.snapshot_path)}
-              >
-                {detection.snapshot_path ? (
-                  <ImageIcon className="h-12 w-12 text-muted-foreground" />
-                ) : (
-                  <CameraIcon className="h-12 w-12 text-muted-foreground" />
-                )}
-              </div>
-              <CardHeader className="p-4">
-                <div className="flex items-center justify-between">
-                  <CardTitle className="text-sm">{detection.detection_type}</CardTitle>
-                  <span className="text-xs font-medium text-primary">
-                    {(detection.confidence * 100).toFixed(0)}%
-                  </span>
+          {detections.map((detection) => {
+            const snapshotUrl = getSnapshotUrl(detection.snapshot_path);
+            return (
+              <Card key={detection.id} className="overflow-hidden">
+                <div
+                  className="aspect-video bg-muted flex items-center justify-center cursor-pointer relative"
+                  onClick={() => setPreviewImage(snapshotUrl)}
+                >
+                  {snapshotUrl ? (
+                    <img
+                      src={snapshotUrl}
+                      alt={`Detection from ${getCameraName(detection.camera_id)}`}
+                      className="w-full h-full object-cover"
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).style.display = 'none';
+                      }}
+                    />
+                  ) : (
+                    <CameraIcon className="h-12 w-12 text-muted-foreground" />
+                  )}
                 </div>
-              </CardHeader>
-              <CardContent className="p-4 pt-0">
-                <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                  <CameraIcon className="h-3 w-3" />
-                  {getCameraName(detection.camera_id)}
-                </div>
-                <div className="flex items-center gap-2 text-xs text-muted-foreground mt-1">
-                  <Calendar className="h-3 w-3" />
-                  {formatDate(detection.detected_at)}
-                </div>
-                <div className="flex justify-end mt-2">
-                  <Button variant="ghost" size="sm" onClick={() => deleteDetection(detection.id)}>
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+                <CardHeader className="p-4">
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-sm">{detection.detection_type}</CardTitle>
+                    <span className="text-xs font-medium text-primary">
+                      {(detection.confidence * 100).toFixed(0)}%
+                    </span>
+                  </div>
+                </CardHeader>
+                <CardContent className="p-4 pt-0">
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <CameraIcon className="h-3 w-3" />
+                    {getCameraName(detection.camera_id)}
+                  </div>
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground mt-1">
+                    <Calendar className="h-3 w-3" />
+                    {formatDate(detection.detected_at)}
+                  </div>
+                  {detection.description && (
+                    <div className="mt-2 text-xs text-muted-foreground line-clamp-2">
+                      {detection.description}
+                    </div>
+                  )}
+                  <div className="flex justify-end mt-2">
+                    <Button variant="ghost" size="sm" onClick={() => deleteDetection(detection.id)}>
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })}
         </div>
       )}
 
@@ -133,13 +156,25 @@ export function Detections() {
           <DialogHeader>
             <DialogTitle>Detection Snapshot</DialogTitle>
             <DialogDescription>
-              {previewImage && detections.find((d) => d.snapshot_path === previewImage)
-                ? getCameraName(detections.find((d) => d.snapshot_path === previewImage)!.camera_id)
+              {previewImage &&
+              detections.find((d) => getSnapshotUrl(d.snapshot_path) === previewImage)
+                ? getCameraName(
+                    detections.find((d) => getSnapshotUrl(d.snapshot_path) === previewImage)!
+                      .camera_id
+                  )
                 : ''}
             </DialogDescription>
           </DialogHeader>
           <div className="flex items-center justify-center bg-muted rounded-lg aspect-video">
-            <ImageIcon className="h-24 w-24 text-muted-foreground" />
+            {previewImage ? (
+              <img
+                src={previewImage}
+                alt="Detection snapshot"
+                className="max-w-full max-h-full object-contain"
+              />
+            ) : (
+              <ImageIcon className="h-24 w-24 text-muted-foreground" />
+            )}
           </div>
         </DialogContent>
       </Dialog>

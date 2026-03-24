@@ -5,7 +5,7 @@ import {
   closeWebSocketConnection,
   WebSocketConnection,
 } from '@/lib/websocket';
-import { Video, X, Play } from 'lucide-react';
+import { Video, X, Play, Square } from 'lucide-react';
 
 interface CameraConnection {
   camera: Camera;
@@ -154,27 +154,30 @@ export function LiveView() {
     [selectedCamera, disconnectCamera]
   );
 
-  const handleBackToGrid = useCallback(() => {
-    // Reconnect all cameras when going back to grid
-    connections.forEach((conn, cameraId) => {
-      if (conn.status === 'closed' || !conn.wsConnection) {
-        const camera = cameras.find((c) => c.id === cameraId);
-        if (camera) {
-          connectCamera(camera);
-        }
+  const handleStopStreamForCamera = useCallback(
+    (cameraId: number) => {
+      disconnectCamera(cameraId);
+    },
+    [disconnectCamera]
+  );
+
+  const handlePlayCamera = useCallback(
+    (cameraId: number) => {
+      const camera = cameras.find((c) => c.id === cameraId);
+      if (camera) {
+        connectCamera(camera);
+        setSelectedCamera(cameraId);
       }
-    });
+    },
+    [cameras, connectCamera]
+  );
+
+  const handleBackToGrid = useCallback(() => {
     setSelectedCamera(null);
-  }, [connections, cameras, connectCamera]);
+  }, []);
 
   useEffect(() => {
-    fetchCameras().then((enabledCameras) => {
-      // Only auto-connect to first 2 cameras in grid mode
-      const camerasToConnect = enabledCameras.slice(0, 2);
-      camerasToConnect.forEach((camera) => {
-        connectCamera(camera);
-      });
-    });
+    fetchCameras();
 
     return () => {
       // Cleanup all connections on unmount
@@ -279,7 +282,7 @@ export function LiveView() {
 
   return (
     <div>
-      <h2 className="text-2xl font-bold mb-6">Live View (Click to focus)</h2>
+      <h2 className="text-2xl font-bold mb-6">Live View</h2>
       <div
         className="grid gap-4"
         style={{
@@ -289,11 +292,11 @@ export function LiveView() {
       >
         {cameras.map((camera) => {
           const conn = connections.get(camera.id);
+          const isConnected = conn?.status === 'connected' || conn?.status === 'connecting';
           return (
             <div
               key={camera.id}
-              className="relative aspect-video bg-black rounded-lg overflow-hidden cursor-pointer hover:ring-2 ring-primary"
-              onClick={() => handleCameraClick(camera.id)}
+              className="relative aspect-video bg-black rounded-lg overflow-hidden"
             >
               <img
                 ref={(el) => setImgRef(camera.id, el)}
@@ -301,9 +304,32 @@ export function LiveView() {
                 className="w-full h-full object-cover"
               />
               {/* Camera name overlay */}
-              <div className="absolute top-0 left-0 right-0 bg-gradient-to-b from-black/70 to-transparent p-2">
+              <div className="absolute top-0 left-0 right-0 bg-gradient-to-b from-black/70 to-transparent p-2 z-10">
                 <span className="text-white text-sm font-medium">{camera.name}</span>
               </div>
+              {/* Play/Stop button */}
+              <button
+                onClick={() =>
+                  isConnected ? handleStopStreamForCamera(camera.id) : handlePlayCamera(camera.id)
+                }
+                className={`absolute bottom-2 right-2 z-20 flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium ${
+                  isConnected
+                    ? 'bg-destructive text-destructive-foreground hover:bg-destructive/90'
+                    : 'bg-primary text-primary-foreground hover:bg-primary/90'
+                }`}
+              >
+                {isConnected ? (
+                  <>
+                    <Square className="h-3 w-3" />
+                    Stop
+                  </>
+                ) : (
+                  <>
+                    <Play className="h-3 w-3" />
+                    Play
+                  </>
+                )}
+              </button>
               {/* Status indicator */}
               {conn?.status === 'connecting' && (
                 <div className="absolute inset-0 flex items-center justify-center bg-black/50">
@@ -317,9 +343,9 @@ export function LiveView() {
                   </div>
                 </div>
               )}
-              {conn?.status === 'closed' && (
+              {!conn && (
                 <div className="absolute inset-0 flex items-center justify-center bg-black/50">
-                  <div className="text-white text-sm">Click to connect</div>
+                  <div className="text-white text-sm">Not playing</div>
                 </div>
               )}
             </div>

@@ -1,21 +1,39 @@
 import aiohttp
 from typing import Optional
 
-from app.core.config import settings
+from app.models.database import SettingsModel, get_db, SessionLocal
+from app.core.security import decrypt_credentials
 
 
 class TelegramNotifier:
     def __init__(self, bot_token: Optional[str] = None, chat_id: Optional[str] = None):
-        self.bot_token = bot_token or settings.TELEGRAM_BOT_TOKEN
-        self.chat_id = chat_id or settings.TELEGRAM_CHAT_ID
+        self.bot_token = bot_token
+        self.chat_id = chat_id
+
+    def _get_credentials(self) -> tuple[Optional[str], Optional[str]]:
+        """Fetch Telegram credentials from database."""
+        db = SessionLocal()
+        try:
+            bot_token = None
+            chat_id = None
+            settings = db.query(SettingsModel).all()
+            for s in settings:
+                if s.key == "telegram_bot_token":
+                    bot_token = decrypt_credentials(s.value) if s.value else None
+                elif s.key == "telegram_chat_id":
+                    chat_id = decrypt_credentials(s.value) if s.value else None
+            return bot_token, chat_id
+        finally:
+            db.close()
 
     async def send_message(self, text: str) -> bool:
-        if not self.bot_token or not self.chat_id:
+        bot_token, chat_id = self._get_credentials()
+        if not bot_token or not chat_id:
             return False
 
-        url = f"https://api.telegram.org/bot{self.bot_token}/sendMessage"
+        url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
         payload = {
-            "chat_id": self.chat_id,
+            "chat_id": chat_id,
             "text": text,
             "parse_mode": "HTML",
         }
@@ -28,12 +46,13 @@ class TelegramNotifier:
             return False
 
     async def send_photo(self, photo_path: str, caption: str) -> bool:
-        if not self.bot_token or not self.chat_id:
+        bot_token, chat_id = self._get_credentials()
+        if not bot_token or not chat_id:
             return False
 
-        url = f"https://api.telegram.org/bot{self.bot_token}/sendPhoto"
+        url = f"https://api.telegram.org/bot{bot_token}/sendPhoto"
         form = aiohttp.FormData()
-        form.add_field("chat_id", self.chat_id)
+        form.add_field("chat_id", chat_id)
         form.add_field("caption", caption)
         form.add_field("parse_mode", "HTML")
         form.add_field("photo", open(photo_path, "rb"), filename="snapshot.jpg", content_type="image/jpeg")

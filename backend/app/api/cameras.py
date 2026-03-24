@@ -17,6 +17,8 @@ class CameraCreate(BaseModel):
     username: Optional[str] = None
     password: Optional[str] = None
     enabled: bool = True
+    detection_enabled: bool = True
+    notification_enabled: bool = True
     roi_x: int = 0
     roi_y: int = 0
     roi_width: int = 0
@@ -31,6 +33,8 @@ class CameraUpdate(BaseModel):
     username: Optional[str] = None
     password: Optional[str] = None
     enabled: Optional[bool] = None
+    detection_enabled: Optional[bool] = None
+    notification_enabled: Optional[bool] = None
     roi_x: Optional[int] = None
     roi_y: Optional[int] = None
     roi_width: Optional[int] = None
@@ -44,6 +48,8 @@ class CameraResponse(BaseModel):
     stream_url: str
     rtsp_url: Optional[str]
     enabled: bool
+    detection_enabled: bool
+    notification_enabled: bool
     roi_x: int
     roi_y: int
     roi_width: int

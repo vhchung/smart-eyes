@@ -20,6 +20,8 @@ export interface Camera {
   stream_url: string;
   rtsp_url: string | null;
   enabled: boolean;
+  detection_enabled: boolean;
+  notification_enabled: boolean;
   roi_x: number;
   roi_y: number;
   roi_width: number;
@@ -34,6 +36,8 @@ export interface CameraCreate {
   username?: string;
   password?: string;
   enabled?: boolean;
+  detection_enabled?: boolean;
+  notification_enabled?: boolean;
   roi_x?: number;
   roi_y?: number;
   roi_width?: number;
