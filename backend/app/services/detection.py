@@ -318,7 +318,8 @@ class DetectionService:
         if camera.roi_width > 0 and camera.roi_height > 0:
             roi = (camera.roi_x, camera.roi_y, camera.roi_width, camera.roi_height)
 
-        min_confidence = camera.detection_sensitivity or settings.DETECTION_MIN_CONFIDENCE
+        # Use global min confidence setting
+        min_confidence = settings.DETECTION_MIN_CONFIDENCE
 
         while self._running:
             try:
