@@ -15,7 +15,8 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Camera, Plus, Pencil, Trash2, Eye } from 'lucide-react';
-import { CameraCreate } from '@/lib/api';
+import { CameraCreate, api } from '@/lib/api';
+import { PolygonCanvas } from '@/components/PolygonCanvas';
 
 export function Cameras() {
   const { cameras, fetchCameras, addCamera, updateCamera, removeCamera, loading } =
@@ -24,6 +25,9 @@ export function Cameras() {
   const [editingId, setEditingId] = useState<number | null>(null);
   const [roiDialogOpen, setRoiDialogOpen] = useState(false);
   const [selectedCamera, setSelectedCamera] = useState<number | null>(null);
+  const [snapshotImage, setSnapshotImage] = useState<string | null>(null);
+  const [loadingSnapshot, setLoadingSnapshot] = useState(false);
+  const [roiPolygon, setRoiPolygon] = useState<Array<{ x: number; y: number }>>([]);
 
   const [formData, setFormData] = useState<CameraCreate>({
     name: '',
@@ -38,6 +42,7 @@ export function Cameras() {
     roi_y: 0,
     roi_width: 0,
     roi_height: 0,
+    roi_polygon: null,
     detection_sensitivity: 0.5,
   });
 
@@ -59,6 +64,7 @@ export function Cameras() {
         roi_y: camera.roi_y,
         roi_width: camera.roi_width,
         roi_height: camera.roi_height,
+        roi_polygon: camera.roi_polygon,
         detection_sensitivity: camera.detection_sensitivity,
       });
     } else {
@@ -76,6 +82,7 @@ export function Cameras() {
         roi_y: 0,
         roi_width: 0,
         roi_height: 0,
+        roi_polygon: null,
         detection_sensitivity: 0.5,
       });
     }
@@ -97,31 +104,38 @@ export function Cameras() {
     }
   };
 
-  const handleROI = (cameraId: number) => {
+  const handleROI = async (cameraId: number) => {
     setSelectedCamera(cameraId);
     const camera = cameras.find((c) => c.id === cameraId);
     if (camera) {
-      setFormData((prev) => ({
-        ...prev,
-        roi_x: camera.roi_x,
-        roi_y: camera.roi_y,
-        roi_width: camera.roi_width,
-        roi_height: camera.roi_height,
-      }));
+      setRoiPolygon(camera.roi_polygon || []);
+      setLoadingSnapshot(true);
+      try {
+        const snapshot = await api.cameras.getSnapshot(cameraId);
+        setSnapshotImage(`data:image/jpeg;base64,${snapshot.image}`);
+      } catch (err) {
+        console.error('Failed to load snapshot:', err);
+        setSnapshotImage(null);
+      } finally {
+        setLoadingSnapshot(false);
+      }
     }
     setRoiDialogOpen(true);
+  };
+
+  const handleClearPolygon = () => {
+    setRoiPolygon([]);
   };
 
   const handleSaveROI = async () => {
     if (selectedCamera) {
       await updateCamera(selectedCamera, {
-        roi_x: formData.roi_x,
-        roi_y: formData.roi_y,
-        roi_width: formData.roi_width,
-        roi_height: formData.roi_height,
+        roi_polygon: roiPolygon.length >= 3 ? roiPolygon : null,
       });
     }
     setRoiDialogOpen(false);
+    setSnapshotImage(null);
+    setRoiPolygon([]);
   };
 
   return (
@@ -311,68 +325,54 @@ export function Cameras() {
       </Dialog>
 
       <Dialog open={roiDialogOpen} onOpenChange={setRoiDialogOpen}>
-        <DialogContent>
+        <DialogContent className="max-w-3xl">
           <DialogHeader>
             <DialogTitle>Region of Interest (ROI)</DialogTitle>
             <DialogDescription>
-              Set the region of interest for {cameras.find((c) => c.id === selectedCamera)?.name}
+              Draw a polygon on the camera frame to define the detection zone for{' '}
+              {cameras.find((c) => c.id === selectedCamera)?.name}. Click to add points,
+              double-click on a point to remove it (minimum 3 points required).
             </DialogDescription>
           </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="roi_x">X Position</Label>
-                <Input
-                  id="roi_x"
-                  type="number"
-                  value={formData.roi_x}
-                  onChange={(e) =>
-                    setFormData({ ...formData, roi_x: parseInt(e.target.value) || 0 })
-                  }
-                />
+          <div className="py-4">
+            {loadingSnapshot ? (
+              <div className="flex items-center justify-center h-64 bg-muted rounded-md">
+                <p className="text-muted-foreground">Loading camera snapshot...</p>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="roi_y">Y Position</Label>
-                <Input
-                  id="roi_y"
-                  type="number"
-                  value={formData.roi_y}
-                  onChange={(e) =>
-                    setFormData({ ...formData, roi_y: parseInt(e.target.value) || 0 })
-                  }
-                />
+            ) : snapshotImage ? (
+              <PolygonCanvas
+                imageUrl={snapshotImage}
+                polygon={roiPolygon}
+                onPolygonChange={setRoiPolygon}
+              />
+            ) : (
+              <div className="flex items-center justify-center h-64 bg-muted rounded-md">
+                <p className="text-muted-foreground">
+                  Failed to load snapshot. Make sure the camera is enabled and streaming.
+                </p>
               </div>
+            )}
+          </div>
+          <div className="flex items-center justify-between">
+            <div className="text-sm text-muted-foreground">
+              {roiPolygon.length < 3
+                ? `Add ${3 - roiPolygon.length} more point${3 - roiPolygon.length > 1 ? 's' : ''} to create a polygon`
+                : `${roiPolygon.length} points defined`}
             </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="roi_width">Width</Label>
-                <Input
-                  id="roi_width"
-                  type="number"
-                  value={formData.roi_width}
-                  onChange={(e) =>
-                    setFormData({ ...formData, roi_width: parseInt(e.target.value) || 0 })
-                  }
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="roi_height">Height</Label>
-                <Input
-                  id="roi_height"
-                  type="number"
-                  value={formData.roi_height}
-                  onChange={(e) =>
-                    setFormData({ ...formData, roi_height: parseInt(e.target.value) || 0 })
-                  }
-                />
-              </div>
-            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleClearPolygon}
+              disabled={roiPolygon.length === 0}
+            >
+              Clear Polygon
+            </Button>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setRoiDialogOpen(false)}>
               Cancel
             </Button>
-            <Button onClick={handleSaveROI} disabled={loading}>
+            <Button onClick={handleSaveROI} disabled={loading || roiPolygon.length < 3}>
               Save ROI
             </Button>
           </DialogFooter>

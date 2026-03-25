@@ -26,6 +26,7 @@ export interface Camera {
   roi_y: number;
   roi_width: number;
   roi_height: number;
+  roi_polygon: Array<{ x: number; y: number }> | null;
   detection_sensitivity: number;
 }
 
@@ -42,6 +43,7 @@ export interface CameraCreate {
   roi_y?: number;
   roi_width?: number;
   roi_height?: number;
+  roi_polygon?: Array<{ x: number; y: number }> | null;
   detection_sensitivity?: number;
 }
 
@@ -73,6 +75,7 @@ export const api = {
     update: (id: number, data: Partial<CameraCreate>) =>
       fetchJson<Camera>(`/cameras/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
     delete: (id: number) => fetchJson<{ message: string }>(`/cameras/${id}`, { method: 'DELETE' }),
+    getSnapshot: (id: number) => fetchJson<{ image: string }>(`/cameras/${id}/snapshot`),
   },
 
   settings: {

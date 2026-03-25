@@ -1,4 +1,4 @@
-from sqlalchemy import create_engine, Column, Integer, String, Boolean, DateTime, Text, Float
+from sqlalchemy import create_engine, Column, Integer, String, Boolean, DateTime, Text, Float, JSON
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 from datetime import datetime
@@ -26,6 +26,7 @@ class Camera(Base):
     roi_y = Column(Integer, default=0)
     roi_width = Column(Integer, default=0)
     roi_height = Column(Integer, default=0)
+    roi_polygon = Column(JSON, default=None)  # [{"x": 0.1, "y": 0.2}, ...] normalized coords
     detection_sensitivity = Column(Float, default=0.5)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

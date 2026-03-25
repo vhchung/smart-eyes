@@ -38,6 +38,23 @@ class DetectionResult:
     snapshot_path: Optional[str] = None
 
 
+def point_in_polygon(x: int, y: int, polygon: list[tuple[int, int]]) -> bool:
+    """Ray casting algorithm - returns True if point (x, y) is inside polygon."""
+    n = len(polygon)
+    if n < 3:
+        return False
+
+    inside = False
+    j = n - 1
+    for i in range(n):
+        xi, yi = polygon[i]
+        xj, yj = polygon[j]
+        if ((yi > y) != (yj > y)) and (x < (xj - xi) * (y - yi) / (yj - yi) + xi):
+            inside = not inside
+        j = i
+    return inside
+
+
 class FrameSampler:
     """Samples frames from RTSP streams at configurable intervals."""
 
@@ -216,6 +233,7 @@ class DetectionService:
     def __init__(self):
         self._running = False
         self._tasks: dict[int, asyncio.Task] = {}
+        self._cameras: dict[int, Camera] = {}  # Store camera references for updates
         self._last_notification_time: dict[int, float] = {}
         self._frame_sampler = FrameSampler
         self._person_detector = PersonDetector()
@@ -297,8 +315,9 @@ class DetectionService:
                 if rtsp_url:
                     username = decrypt_credentials(camera.username_encrypted) if camera.username_encrypted else None
                     password = decrypt_credentials(camera.password_encrypted) if camera.password_encrypted else None
+                    self._cameras[camera.id] = camera  # Store for later updates
                     self._tasks[camera.id] = asyncio.create_task(
-                        self._detection_loop(camera, rtsp_url, username, password)
+                        self._detection_loop(camera.id, rtsp_url, username, password)
                     )
                     logger.info(f"Started detection loop for camera {camera.id}")
         finally:
@@ -316,23 +335,50 @@ class DetectionService:
                 pass
         self._tasks.clear()
 
+    def update_camera(self, camera_id: int):
+        """Update stored camera reference for detection loops by reloading from database."""
+        if camera_id in self._cameras:
+            # Reload camera from database to get fresh data in detection service's session
+            db = SessionLocal()
+            try:
+                updated_camera = db.query(Camera).filter(Camera.id == camera_id).first()
+                if updated_camera:
+                    stored_camera = self._cameras[camera_id]
+                    stored_camera.roi_x = updated_camera.roi_x
+                    stored_camera.roi_y = updated_camera.roi_y
+                    stored_camera.roi_width = updated_camera.roi_width
+                    stored_camera.roi_height = updated_camera.roi_height
+                    stored_camera.roi_polygon = updated_camera.roi_polygon
+                    stored_camera.detection_enabled = updated_camera.detection_enabled
+                    logger.info(f"Updated camera {camera_id} ROI in detection service")
+            finally:
+                db.close()
+
     async def _detection_loop(
         self,
-        camera: Camera,
+        camera_id: int,
         rtsp_url: str,
         username: Optional[str],
         password: Optional[str],
     ):
         """Detection loop for a single camera."""
         sampler = self._frame_sampler(rtsp_url, username, password)
-        roi = None
-        if camera.roi_width > 0 and camera.roi_height > 0:
-            roi = (camera.roi_x, camera.roi_y, camera.roi_width, camera.roi_height)
+        polygon_pixels: Optional[list[tuple[int, int]]] = None
 
         # Use global min confidence setting
         min_confidence = settings.DETECTION_MIN_CONFIDENCE
 
         while self._running:
+            # Get fresh camera reference to pick up updates
+            camera = self._cameras.get(camera_id)
+            if not camera:
+                break
+
+            # Recalculate ROI each iteration to pick up camera updates
+            roi = None
+            if camera.roi_polygon is None and camera.roi_width > 0 and camera.roi_height > 0:
+                roi = (camera.roi_x, camera.roi_y, camera.roi_width, camera.roi_height)
+
             try:
                 frame = await asyncio.get_event_loop().run_in_executor(
                     None, sampler.get_frame, roi
@@ -342,6 +388,25 @@ class DetectionService:
                     continue
 
                 persons = self._person_detector.detect(frame, min_confidence)
+
+                # Filter by polygon ROI if defined
+                if camera.roi_polygon and persons:
+                    frame_width, frame_height = frame.size
+                    # Convert normalized polygon coords to pixel coords
+                    polygon_pixels = [
+                        (int(pt['x'] * frame_width), int(pt['y'] * frame_height))
+                        for pt in camera.roi_polygon
+                    ]
+                    # Filter to persons whose center is inside the polygon
+                    filtered_persons = []
+                    for person in persons:
+                        x1, y1, x2, y2 = person.bbox
+                        center_x = (x1 + x2) // 2
+                        center_y = (y1 + y2) // 2
+                        if point_in_polygon(center_x, center_y, polygon_pixels):
+                            filtered_persons.append(person)
+                    persons = filtered_persons
+
                 if persons:
                     descriptions = []
                     for person in persons:
