@@ -113,12 +113,16 @@ class PersonDetector:
     def detect(self, image: Image.Image, min_confidence: float = 0.5) -> list[PersonDetection]:
         """Detect persons in the image.
 
-        Only detects persons that appear to be fully visible (head to toe).
+        Uses relaxed criteria suitable for surveillance cameras at various angles.
+        Filters out only clearly invalid detections (too small, or cut off at frame edges).
         """
         self._load_model()
         results = self._model(image, verbose=False)
         persons = []
         img_width, img_height = image.size
+
+        # Edge margin to consider a detection as "at edge" (5% of frame)
+        edge_margin = img_height * 0.05
 
         for result in results:
             boxes = result.boxes
@@ -132,19 +136,26 @@ class PersonDetector:
                     bbox_width = x2 - x1
                     bbox_height = y2 - y1
 
-                    # Skip if person is too small (less than 20% of frame height)
-                    # This filters out distant/partial detections
-                    if bbox_height < img_height * 0.20:
+                    # Skip if person is too small (less than 10% of frame height)
+                    # This filters out very distant/partial detections
+                    if bbox_height < img_height * 0.10:
                         continue
 
-                    # Skip if person is cut off at the bottom (feet not visible)
-                    # Person is considered complete if bottom of bbox is near frame bottom
-                    if y2 < img_height * 0.85:
+                    # Skip if person is cut off at both top AND bottom of frame
+                    # This indicates a true partial detection crossing frame boundary
+                    # Allow partial if cut off at only one end (head or feet missing, not both)
+                    at_top_edge = y1 < edge_margin
+                    at_bottom_edge = y2 > img_height - edge_margin
+                    if not at_top_edge and not at_bottom_edge:
+                        # Not at either edge - definitely a valid full person
+                        pass
+                    elif at_top_edge and at_bottom_edge:
+                        # Cut off at both ends - this is a cross-frame partial, skip
                         continue
 
-                    # Skip if person is cut off at top (head not visible)
-                    # Person is considered complete if top of bbox is near frame top
-                    if y1 > img_height * 0.15:
+                    # Skip if person is cut off at left OR right edge of frame
+                    # (crossing frame boundary horizontally)
+                    if x1 < edge_margin and x2 > img_width - edge_margin:
                         continue
 
                     persons.append(PersonDetection(

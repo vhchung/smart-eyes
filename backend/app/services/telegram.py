@@ -63,8 +63,6 @@ class TelegramNotifier:
                     return resp.status == 200
         except Exception:
             return False
-        finally:
-            form.remove_file("photo")
 
     async def send_detection_alert(
         self,
