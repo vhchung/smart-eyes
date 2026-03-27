@@ -24,7 +24,7 @@ cd "$BACKEND_DIR"
 exec "$VENV_DIR/bin/uvicorn" \
     app.main:app \
     --host 0.0.0.0 \
-    --port 8000 \
+    --port 8118 \
     --workers 1 \
     --log-level info \
     >> "$LOG_DIR/backend.log" \
