@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.smart-eyes.backend</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/bash</string>
+        <string>${HOME}/Projects/smart-eyes/scripts/start-backend.sh</string>
+    </array>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>SMART_EYES_HOME</key>
+        <string>${HOME}/Projects/smart-eyes</string>
+    </dict>
+
+    <key>RunAtLoad</key>
+    <true/>
+
+    <key>KeepAlive</key>
+    <true/>
+
+    <key>StandardOutPath</key>
+    <string>${HOME}/Projects/smart-eyes/logs/backend.log</string>
+
+    <key>StandardErrorPath</key>
+    <string>${HOME}/Projects/smart-eyes/logs/backend.error.log</string>
+
+    <key>WorkingDirectory</key>
+    <string>${HOME}/Projects/smart-eyes/backend</string>
+
+    <key>ProcessType</key>
+    <string>Background</string>
+</dict>
+</plist>
